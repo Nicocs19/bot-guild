@@ -1,0 +1,31 @@
+=====================================================
+  HOGGER 24/7 GRATIS EN GOOGLE CLOUD (e2-micro)
+=====================================================
+Google regala para siempre una máquina chiquita (e2-micro) que alcanza
+de sobra para Hogger. Pide tarjeta para verificar, pero no cobra si
+seguís estos pasos al pie de la letra (región y tipo de máquina).
+
+1. Entrá a https://console.cloud.google.com y creá la cuenta (pide tarjeta).
+2. Menú ☰ → Compute Engine → Instancias de VM → "Crear instancia".
+   (la primera vez te pide "Habilitar" la API: aceptá y esperá)
+3. Configurá EXACTO así:
+     Nombre: hogger
+     Región: us-east1 (Carolina del Sur)   ← tiene que ser us-east1, us-central1 o us-west1
+     Tipo de máquina: e2-micro
+     Disco de arranque: Debian, "Disco persistente estándar", 10 GB
+   Tocá "Crear".
+4. Cuando aparezca, tocá el botón "SSH" de esa fila. Se abre una consola negra.
+5. Arriba a la derecha de esa consola: ⚙ / "Subir archivo" → subí Hogger_bot.zip.
+6. Pegá esto y Enter:
+     unzip -oq Hogger_bot.zip && bash bot/instalar_servidor.sh
+   Te pide el TOKEN (pegalo con Ctrl+Shift+V o clic derecho, no se ve) y el ID del server.
+7. Cuando diga "Listo", APAGÁ el Hogger de tu PC (cerrá la ventana negra
+   y sacá el acceso directo de shell:startup si lo pusiste).
+   Si quedan los dos prendidos, todo sale repetido.
+
+Tus bandas/sorteos activos: antes del paso 6, subí también tu datos.json
+(está en la carpeta bot de tu PC) y después de descomprimir corré:
+     mv datos.json bot/
+
+Actualizar Hogger más adelante: subí el zip nuevo y corré
+     unzip -oq Hogger_bot.zip && sudo systemctl restart hogger
