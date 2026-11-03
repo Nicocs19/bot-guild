@@ -1,0 +1,49 @@
+{
+  "ajustes": {
+    "canal_roles": 1553552712342437998,
+    "canal_bienvenida": 1553552618029056103
+  },
+  "bandas": {},
+  "sorteos": {},
+  "encuestas": {},
+  "raids": {
+    "1567073115773730817": {
+      "nombre": "Molten Core",
+      "inicio": 1794790800.0,
+      "cupo": 20,
+      "nota": "Gear minimo:3000 gs",
+      "anotados": {
+        "1364887213346656288": {
+          "uid": "1364887213346656288",
+          "nombre": "Mr. H",
+          "clase": "Guerrero",
+          "spec": "Protección",
+          "rol": "tanque",
+          "orden": 1,
+          "estado": null
+        }
+      },
+      "canal": 1553553048494805012,
+      "contador": 1
+    },
+    "1567074131760128050": {
+      "nombre": "Molten Core",
+      "inicio": 1794618000.0,
+      "cupo": 40,
+      "nota": "",
+      "anotados": {
+        "1364887213346656288": {
+          "uid": "1364887213346656288",
+          "nombre": "Mr. H",
+          "clase": "Guerrero",
+          "spec": "Protección",
+          "rol": "tanque",
+          "orden": 1,
+          "estado": "tentativo"
+        }
+      },
+      "canal": 1553553048494805012,
+      "contador": 1
+    }
+  }
+}
