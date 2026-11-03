@@ -43,6 +43,32 @@ control.py borrar-rol "Nombre"
 ```
 Solo usa la API REST de Discord (no abre una segunda sesión), así que puede correr al mismo tiempo que el bot.
 
+## Buzón de El Cerebro (órdenes automáticas)
+El Cerebro (en la PC) publica órdenes en el canal privado `#cerebro` usando el token de Hogger, así que el autor es el propio Hogger. Hogger solo obedece mensajes suyos en ese canal que empiezan con `🧠 orden`, los ejecuta con las mismas funciones que los comandos y responde al mensaje con `✅` o `❌` y un JSON con el resultado (`link`, `id`).
+No abre puertos ni necesita el intent de contenido de mensajes: un bot siempre puede leer sus propios mensajes.
+
+Formato de la orden:
+````
+🧠 orden
+```json
+{"accion": "raid", "nombre": "Molten Core", "fecha": "2026-11-07 21:00", "cupo": 20, "nota": "Traer resistencias"}
+```
+````
+Acciones y campos (los canales por defecto están en `CANALES_CEREBRO` de `config.py`):
+| Acción | Campos |
+|---|---|
+| `anuncio` | `titulo`, `texto`, `tipo` (aviso, evento, importante, parche), `mencionar` (rol o everyone), `canal`, `imagen` (link) |
+| `mensaje` | `texto`, `mencionar`, `canal` |
+| `raid` | `nombre`, `fecha` (`AAAA-MM-DD HH:MM` hora de la guild), `cupo` (5 a 40), `nota`, `avisar`, `canal` |
+| `banda` | `nombre`, `cuando`, `tanques`, `healers`, `dps`, `nota`, `avisar`, `canal` |
+| `sorteo` | `premio`, `horas` (0.05 a 720), `ganadores` (1 a 20), `descripcion`, `avisar`, `imagen`, `canal` |
+| `encuesta` | `pregunta`, `opciones` (lista de 2 a 5), `horas`, `mencionar`, `canal` |
+| `cerrar` | `tipo` (raid o banda) + `id` (o `"ultimo"`), o `link`; `cerrar: false` la reabre |
+| `borrar` | `link`, o `tipo` + `id` (o `"ultimo"`). Solo borra mensajes de Hogger |
+| `estado` | Devuelve canales, roles mencionables y raids próximas |
+
+Si Hogger no tiene el permiso **Gestionar canales**, `#cerebro` no se crea solo: crealo como canal privado y dale acceso al rol de Hogger.
+
 ## Estructura del server (3/11/2026)
 - Canales: bienvenidas, reglas, elige-tus-roles, en-vivo, videos-nuevos, anuncios-guild, RAID (voz), general, clips-y-memes, subidas-de-nivel, raids-signup, builds-y-guias, más canales de voz.
 - Roles, de arriba hacia abajo: Hogger el H, GM, Oficial, Core, Creador de contenido, Veterano, las 9 clases (con colores oficiales), H, Recluta, Tanque, Healer, DPS, PvE, PvP, Economía, Leveleo en grupo, Taberna, las 9 profesiones, y los avisos (Eventos de la guild, Llamado a bandas, Sorteos, En vivo, Videos nuevos).

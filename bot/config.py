@@ -165,3 +165,19 @@ SORTEO_MP_TEXTO = (
     "¡Gracias por ser parte de la hermandad! ⚔️"
 )
 SORTEO_CONTACTO = "Mr. H"
+
+# ------------------------------------------------------------
+#  EL CEREBRO (órdenes por voz desde la PC de Nicolas)
+#  Canal privado donde El Cerebro deja las órdenes. Hogger lo crea solo si
+#  tiene el permiso "Gestionar canales"; si no, crealo a mano como privado.
+# ------------------------------------------------------------
+CANAL_CEREBRO = "cerebro"
+# Canal por defecto de cada tipo de orden (si la orden no dice otro)
+CANALES_CEREBRO = {
+    "anuncio": "anuncios-guild",
+    "mensaje": "general",
+    "raid": "raids-signup",
+    "banda": "raids-signup",
+    "sorteo": "anuncios-guild",
+    "encuesta": "general",
+}

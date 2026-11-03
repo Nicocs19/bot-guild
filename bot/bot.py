@@ -523,7 +523,9 @@ def parsear_fecha(texto):
     texto = texto.strip().replace("-", "/").replace("hs", "").replace("h", "").strip()
     tz = timezone(timedelta(hours=config.HUSO_HORARIO))
     ahora = datetime.now(tz)
-    for fmt in ("%d/%m/%Y %H:%M", "%d/%m %H:%M", "%d/%m/%y %H:%M", "%d/%m/%Y %H", "%d/%m %H", "%d/%m/%y %H"):
+    texto = texto.replace("T", " ")  # formato ISO del Cerebro: 2026-11-07T21:00
+    for fmt in ("%d/%m/%Y %H:%M", "%d/%m %H:%M", "%d/%m/%y %H:%M", "%d/%m/%Y %H", "%d/%m %H", "%d/%m/%y %H",
+                "%Y/%m/%d %H:%M"):
         try:
             d = datetime.strptime(texto, fmt)
         except ValueError:
@@ -692,6 +694,25 @@ TIPOS_ANUNCIO = {  # icono, color, etiqueta
 }
 
 
+def armar_anuncio(titulo, texto, tipo="aviso", imagen=""):
+    """Embed del anuncio con el estilo de la guild. Devuelve (embed, archivo_de_cabecera_o_None)."""
+    icono, color, etiqueta = TIPOS_ANUNCIO.get(tipo, TIPOS_ANUNCIO["aviso"])
+    e = embed_base(f"{icono} {titulo}", texto)
+    e.colour = discord.Colour(color)
+    e.set_footer(text=f"{etiqueta} · {config.PIE}")
+    archivo = None
+    imagen = (imagen or "").strip()
+    if imagen.startswith("http"):
+        e.set_image(url=imagen)
+    elif tarjeta is not None:
+        try:
+            archivo = discord.File(tarjeta.crear_cabecera(titulo, etiqueta), filename="banner.png")
+            e.set_image(url="attachment://banner.png")
+        except Exception as err:
+            print("No pude crear la cabecera:", repr(err))
+    return e, archivo
+
+
 class VentanaAnuncio(discord.ui.Modal, title="Nuevo anuncio de Hogger"):
     titulo = discord.ui.TextInput(label="Título", max_length=256)
     texto = discord.ui.TextInput(label="Mensaje", style=discord.TextStyle.paragraph, max_length=4000)
@@ -701,22 +722,10 @@ class VentanaAnuncio(discord.ui.Modal, title="Nuevo anuncio de Hogger"):
         super().__init__()
         self.canal = canal
         self.mencion = mencion
-        self.tipo = TIPOS_ANUNCIO.get(tipo, TIPOS_ANUNCIO["aviso"])
+        self.tipo = tipo
 
     async def on_submit(self, it: discord.Interaction):
-        icono, color, etiqueta = self.tipo
-        e = embed_base(f"{icono} {self.titulo.value}", self.texto.value)
-        e.colour = discord.Colour(color)
-        e.set_footer(text=f"{etiqueta} · {config.PIE}")
-        archivo = None
-        if self.imagen.value.strip().startswith("http"):
-            e.set_image(url=self.imagen.value.strip())
-        elif tarjeta is not None:
-            try:
-                archivo = discord.File(tarjeta.crear_cabecera(self.titulo.value, etiqueta), filename="banner.png")
-                e.set_image(url="attachment://banner.png")
-            except Exception as err:
-                print("No pude crear la cabecera:", repr(err))
+        e, archivo = armar_anuncio(self.titulo.value, self.texto.value, self.tipo, self.imagen.value)
         e.set_author(name=it.user.display_name, icon_url=it.user.display_avatar.url)
         await self.canal.send(
             content=self.mencion.mention if self.mencion else None,
@@ -763,6 +772,7 @@ solo_oficiales = app_commands.default_permissions(manage_guild=True)
 async def on_ready():
     await bot.change_presence(activity=discord.Game(name=f"cuidando a {config.NOMBRE_GUILD}"))
     print(f"✅ Hogger está en línea como {bot.user}. Dejá esta ventana abierta.")
+    await asegurar_canal_cerebro()
 
 
 def embed_bienvenida(member: discord.Member):
@@ -903,6 +913,18 @@ async def anuncio(it: discord.Interaction, canal: discord.TextChannel, tipo: app
     await it.response.send_modal(VentanaAnuncio(canal, mencionar, tipo.value if tipo else "aviso"))
 
 
+async def publicar_banda(guild, canal, nombre, cuando, tanques=1, healers=1, dps=3, nota="", avisar=True):
+    b = {"nombre": nombre, "cuando": cuando, "nota": nota,
+         "cupos": {"tanque": tanques, "healer": healers, "dps": dps},
+         "anotados": {"tanque": [], "healer": [], "dps": []}, "suplentes": [], "canal": canal.id}
+    rol = discord.utils.get(guild.roles, name=config.ROL_AVISO_BANDAS) if avisar else None
+    msg = await canal.send(content=rol.mention if rol else None, embed=embed_banda(b), view=VistaBanda(),
+                           allowed_mentions=discord.AllowedMentions(roles=True))
+    datos["bandas"][str(msg.id)] = b
+    guardar_datos()
+    return msg
+
+
 @bot.tree.command(name="banda", description="Arma una banda o evento para que la gente se anote")
 @solo_oficiales
 @app_commands.guild_only()
@@ -918,14 +940,7 @@ async def banda(it: discord.Interaction, nombre: str, cuando: str,
                 dps: app_commands.Range[int, 0, 40] = 3, nota: str = "", avisar: bool = True,
                 canal: discord.TextChannel = None):
     canal = canal or it.channel
-    b = {"nombre": nombre, "cuando": cuando, "nota": nota,
-         "cupos": {"tanque": tanques, "healer": healers, "dps": dps},
-         "anotados": {"tanque": [], "healer": [], "dps": []}, "suplentes": [], "canal": canal.id}
-    rol = discord.utils.get(it.guild.roles, name=config.ROL_AVISO_BANDAS) if avisar else None
-    msg = await canal.send(content=rol.mention if rol else None, embed=embed_banda(b), view=VistaBanda(),
-                           allowed_mentions=discord.AllowedMentions(roles=True))
-    datos["bandas"][str(msg.id)] = b
-    guardar_datos()
+    await publicar_banda(it.guild, canal, nombre, cuando, tanques, healers, dps, nota, avisar)
     await responder(it, f"Banda publicada en {canal.mention} ✅ Para cerrar inscripciones: clic derecho al mensaje → Apps → Cerrar banda.")
 
 
@@ -942,6 +957,22 @@ async def cerrar_banda(it: discord.Interaction, mensaje: discord.Message):
     await responder(it, "Banda cerrada 🔒" if b["cerrada"] else "Banda reabierta 🔓")
 
 
+async def publicar_sorteo(guild, canal, premio, horas, ganadores=1, descripcion="", avisar=True, archivo=None, imagen_url=""):
+    s = {"premio": premio, "fin": time.time() + horas * 3600, "ganadores": ganadores, "participantes": [], "canal": canal.id,
+         "descripcion": descripcion.replace("\\n", "\n")}
+    if archivo:
+        s["imagen"] = f"attachment://{archivo.filename}"
+    elif (imagen_url or "").startswith("http"):
+        s["imagen"] = imagen_url
+    rol = discord.utils.get(guild.roles, name=config.ROL_AVISO_SORTEOS) if avisar else None
+    extra = {"file": archivo} if archivo else {}
+    msg = await canal.send(content=rol.mention if rol else None, embed=embed_sorteo(s), view=VistaSorteo(0),
+                           allowed_mentions=discord.AllowedMentions(roles=True), **extra)
+    datos["sorteos"][str(msg.id)] = s
+    guardar_datos()
+    return msg
+
+
 @bot.tree.command(name="sorteo", description="Arma un sorteo con botón para participar")
 @solo_oficiales
 @app_commands.guild_only()
@@ -953,19 +984,20 @@ async def sorteo(it: discord.Interaction, premio: str, horas: app_commands.Range
                  avisar: bool = True, canal: discord.TextChannel = None):
     canal = canal or it.channel
     await it.response.defer(ephemeral=True)
-    s = {"premio": premio, "fin": time.time() + horas * 3600, "ganadores": ganadores, "participantes": [], "canal": canal.id,
-         "descripcion": descripcion.replace("\\n", "\n")}
     archivo = None
     if imagen and (imagen.content_type or "").startswith("image"):
         archivo = await imagen.to_file(filename="sorteo" + os.path.splitext(imagen.filename)[1].lower())
-        s["imagen"] = f"attachment://{archivo.filename}"
-    rol = discord.utils.get(it.guild.roles, name=config.ROL_AVISO_SORTEOS) if avisar else None
-    extra = {"file": archivo} if archivo else {}
-    msg = await canal.send(content=rol.mention if rol else None, embed=embed_sorteo(s), view=VistaSorteo(0),
-                           allowed_mentions=discord.AllowedMentions(roles=True), **extra)
-    datos["sorteos"][str(msg.id)] = s
-    guardar_datos()
+    await publicar_sorteo(it.guild, canal, premio, horas, ganadores, descripcion, avisar, archivo=archivo)
     await responder(it, f"Sorteo publicado en {canal.mention} ✅")
+
+
+async def publicar_encuesta(canal, pregunta, ops, horas=24, mencion=None):
+    q = {"pregunta": pregunta, "opciones": ops, "votos": {}, "fin": time.time() + horas * 3600, "canal": canal.id}
+    msg = await canal.send(content=mencion, embed=embed_encuesta(q),
+                           view=VistaEncuesta(ops), allowed_mentions=discord.AllowedMentions(everyone=True, roles=True))
+    datos["encuestas"][str(msg.id)] = q
+    guardar_datos()
+    return msg
 
 
 @bot.tree.command(name="encuesta", description="Arma una encuesta con botones y resultados en vivo")
@@ -981,12 +1013,18 @@ async def encuesta(it: discord.Interaction, pregunta: str, opciones: str,
     if len(ops) < 2:
         return await responder(it, "Necesito al menos 2 opciones separadas con / (ej: Sí / No).")
     canal = canal or it.channel
-    q = {"pregunta": pregunta, "opciones": ops, "votos": {}, "fin": time.time() + horas * 3600, "canal": canal.id}
-    msg = await canal.send(content=mencionar.mention if mencionar else None, embed=embed_encuesta(q),
-                           view=VistaEncuesta(ops), allowed_mentions=discord.AllowedMentions(everyone=True, roles=True))
-    datos["encuestas"][str(msg.id)] = q
-    guardar_datos()
+    await publicar_encuesta(canal, pregunta, ops, horas, mencionar.mention if mencionar else None)
     await responder(it, f"Encuesta publicada en {canal.mention} ✅")
+
+
+async def publicar_raid(guild, canal, nombre, inicio, cupo=20, nota="", avisar=True):
+    r = {"nombre": nombre, "inicio": inicio, "cupo": cupo, "nota": nota, "anotados": {}, "canal": canal.id, "contador": 0}
+    rol = discord.utils.get(guild.roles, name=config.ROL_AVISO_BANDAS) if avisar else None
+    msg = await canal.send(content=rol.mention if rol else None, embed=embed_raid(r), view=VistaRaid(),
+                           allowed_mentions=discord.AllowedMentions(roles=True))
+    datos["raids"][str(msg.id)] = r
+    guardar_datos()
+    return msg
 
 
 @bot.tree.command(name="raid", description="Inscripción de raid por clase y spec (estilo Raid-Helper)")
@@ -1000,12 +1038,7 @@ async def raid(it: discord.Interaction, nombre: str, fecha: str, cupo: app_comma
     if inicio is None:
         return await responder(it, "No entendí la fecha. Escribila así: `15/11 21:00`")
     canal = canal or it.channel
-    r = {"nombre": nombre, "inicio": inicio, "cupo": cupo, "nota": nota, "anotados": {}, "canal": canal.id, "contador": 0}
-    rol = discord.utils.get(it.guild.roles, name=config.ROL_AVISO_BANDAS) if avisar else None
-    msg = await canal.send(content=rol.mention if rol else None, embed=embed_raid(r), view=VistaRaid(),
-                           allowed_mentions=discord.AllowedMentions(roles=True))
-    datos["raids"][str(msg.id)] = r
-    guardar_datos()
+    await publicar_raid(it.guild, canal, nombre, inicio, cupo, nota, avisar)
     await responder(it, f"Raid publicada en {canal.mention} ✅ Para cerrarla: clic derecho al mensaje → Apps → Cerrar raid.")
 
 
@@ -1100,6 +1133,219 @@ async def on_app_error(it: discord.Interaction, error: app_commands.AppCommandEr
         await responder(it, "Uy, algo falló. Fijate que Hogger tenga permisos en ese canal.")
     except discord.HTTPException:
         pass
+
+
+# ============================================================
+#  BUZÓN DEL CEREBRO (órdenes automáticas desde la PC)
+#  El Cerebro escribe en el canal privado config.CANAL_CEREBRO usando el
+#  token de Hogger, así que el autor del mensaje es el propio Hogger. Trae
+#  una orden en JSON; Hogger la ejecuta con las mismas funciones que los
+#  comandos y responde con el resultado. Nadie más puede escribir como
+#  Hogger, así que solo quien tiene el token da órdenes. Sin puertos abiertos.
+# ============================================================
+MARCA_ORDEN = "🧠 orden"
+COLECCIONES = {"raid": "raids", "banda": "bandas", "sorteo": "sorteos", "encuesta": "encuestas"}
+
+
+class OrdenInvalida(Exception):
+    pass
+
+
+def _json_de(texto):
+    if "```" in texto:
+        texto = texto.split("```", 2)[1]
+        texto = texto[4:] if texto.startswith("json") else texto
+    else:
+        texto = texto[len(MARCA_ORDEN):]
+    return json.loads(texto.strip())
+
+
+def _texto(o, campo, maximo, obligatorio=True):
+    v = str(o.get(campo) or "").strip()
+    if obligatorio and not v:
+        raise OrdenInvalida(f"Falta '{campo}'.")
+    if len(v) > maximo:
+        raise OrdenInvalida(f"'{campo}' es muy largo (máximo {maximo} caracteres).")
+    return v
+
+
+def _numero(o, campo, minimo, maximo, defecto, tipo=int):
+    v = o.get(campo, defecto)
+    try:
+        v = tipo(v)
+    except (TypeError, ValueError):
+        raise OrdenInvalida(f"'{campo}' tiene que ser un número.")
+    if not minimo <= v <= maximo:
+        raise OrdenInvalida(f"'{campo}' tiene que estar entre {minimo} y {maximo}.")
+    return v
+
+
+def _canal(guild, nombre, accion):
+    nombre = str(nombre or config.CANALES_CEREBRO.get(accion, "")).lstrip("#").strip().lower()
+    for c in guild.text_channels:
+        if c.name.lower() == nombre or str(c.id) == nombre:
+            return c
+    raise OrdenInvalida(f"No encontré el canal #{nombre}.")
+
+
+def _mencion(guild, nombre):
+    nombre = str(nombre or "").strip().lstrip("@")
+    if not nombre:
+        return None
+    if nombre.lower() in ("everyone", "todos", "here"):
+        return "@everyone" if nombre.lower() != "here" else "@here"
+    rol = discord.utils.find(lambda r: r.name.lower() == nombre.lower(), guild.roles)
+    if rol is None:
+        raise OrdenInvalida(f"No existe el rol '{nombre}'.")
+    return rol.mention
+
+
+def _buscar_publicacion(o):
+    """Devuelve (tipo, msg_id, canal_id) a partir de 'link', o de 'tipo' + 'id' ('ultimo' = la más nueva)."""
+    if o.get("link"):
+        partes = str(o["link"]).rstrip("/").split("/")
+        try:
+            canal_id, msg_id = int(partes[-2]), partes[-1]
+        except (ValueError, IndexError):
+            raise OrdenInvalida("El link del mensaje no es válido.")
+        tipo = next((t for t, col in COLECCIONES.items() if msg_id in datos[col]), "mensaje")
+        return tipo, msg_id, canal_id
+    tipo = o.get("tipo")
+    if tipo not in COLECCIONES:
+        raise OrdenInvalida("Decime 'link', o 'tipo' (raid, banda, sorteo, encuesta) con 'id'.")
+    col = datos[COLECCIONES[tipo]]
+    msg_id = str(o.get("id") or "ultimo")
+    if msg_id == "ultimo":
+        if not col:
+            raise OrdenInvalida(f"No hay ninguna {tipo} guardada.")
+        msg_id = max(col, key=int)
+    if msg_id not in col:
+        raise OrdenInvalida(f"No encontré esa {tipo}.")
+    return tipo, msg_id, col[msg_id]["canal"]
+
+
+async def ejecutar_orden(guild, o):
+    accion = o.get("accion")
+    if accion == "anuncio":
+        canal = _canal(guild, o.get("canal"), accion)
+        tipo = o.get("tipo") if o.get("tipo") in TIPOS_ANUNCIO else "aviso"
+        e, archivo = armar_anuncio(_texto(o, "titulo", 256), _texto(o, "texto", 4000), tipo, o.get("imagen", ""))
+        msg = await canal.send(content=_mencion(guild, o.get("mencionar")), embed=e,
+                               allowed_mentions=discord.AllowedMentions(everyone=True, roles=True),
+                               **({"file": archivo} if archivo else {}))
+        resumen = f"Anuncio publicado en {canal.mention}"
+    elif accion == "mensaje":
+        canal = _canal(guild, o.get("canal"), accion)
+        mencion = _mencion(guild, o.get("mencionar"))
+        texto = _texto(o, "texto", 1900)
+        msg = await canal.send(f"{mencion} {texto}" if mencion else texto,
+                               allowed_mentions=discord.AllowedMentions(everyone=True, roles=True))
+        resumen = f"Mensaje enviado en {canal.mention}"
+    elif accion == "raid":
+        canal = _canal(guild, o.get("canal"), accion)
+        inicio = parsear_fecha(_texto(o, "fecha", 40))
+        if inicio is None:
+            raise OrdenInvalida("No entendí la fecha. Usá 2026-11-07 21:00.")
+        if inicio < time.time():
+            raise OrdenInvalida("Esa fecha ya pasó.")
+        msg = await publicar_raid(guild, canal, _texto(o, "nombre", 100), inicio, _numero(o, "cupo", 5, 40, 20),
+                                  _texto(o, "nota", 500, False), bool(o.get("avisar", True)))
+        resumen = f"Raid publicada en {canal.mention} para el <t:{int(inicio)}:F>"
+    elif accion == "banda":
+        canal = _canal(guild, o.get("canal"), accion)
+        msg = await publicar_banda(guild, canal, _texto(o, "nombre", 100), _texto(o, "cuando", 100),
+                                   _numero(o, "tanques", 0, 40, 1), _numero(o, "healers", 0, 40, 1),
+                                   _numero(o, "dps", 0, 40, 3), _texto(o, "nota", 500, False), bool(o.get("avisar", True)))
+        resumen = f"Banda publicada en {canal.mention}"
+    elif accion == "sorteo":
+        canal = _canal(guild, o.get("canal"), accion)
+        msg = await publicar_sorteo(guild, canal, _texto(o, "premio", 200), _numero(o, "horas", 0.05, 720, 24, float),
+                                    _numero(o, "ganadores", 1, 20, 1), _texto(o, "descripcion", 1000, False),
+                                    bool(o.get("avisar", True)), imagen_url=o.get("imagen", ""))
+        resumen = f"Sorteo publicado en {canal.mention}"
+    elif accion == "encuesta":
+        canal = _canal(guild, o.get("canal"), accion)
+        ops = [str(x).strip()[:80] for x in (o.get("opciones") or []) if str(x).strip()][:5]
+        if len(ops) < 2:
+            raise OrdenInvalida("La encuesta necesita al menos 2 opciones.")
+        msg = await publicar_encuesta(canal, _texto(o, "pregunta", 240), ops, _numero(o, "horas", 1, 720, 24),
+                                      _mencion(guild, o.get("mencionar")))
+        resumen = f"Encuesta publicada en {canal.mention}"
+    elif accion == "cerrar":
+        tipo, msg_id, canal_id = _buscar_publicacion(o)
+        if tipo not in ("raid", "banda"):
+            raise OrdenInvalida("Solo puedo cerrar raids y bandas.")
+        item = datos[COLECCIONES[tipo]][msg_id]
+        item["cerrada"] = bool(o.get("cerrar", True))
+        guardar_datos()
+        canal = bot.get_channel(canal_id)
+        msg = await canal.fetch_message(int(msg_id))
+        await msg.edit(embed=embed_raid(item) if tipo == "raid" else embed_banda(item),
+                       view=VistaRaid() if tipo == "raid" else VistaBanda())
+        resumen = f"{tipo.capitalize()} {'cerrada' if item['cerrada'] else 'reabierta'}: {item['nombre']}"
+    elif accion == "borrar":
+        tipo, msg_id, canal_id = _buscar_publicacion(o)
+        canal = bot.get_channel(canal_id) or await bot.fetch_channel(canal_id)
+        msg = await canal.fetch_message(int(msg_id))
+        if msg.author.id != bot.user.id:
+            raise OrdenInvalida("Solo borro mensajes que publicó Hogger.")
+        await msg.delete()
+        if tipo in COLECCIONES:
+            datos[COLECCIONES[tipo]].pop(msg_id, None)
+            guardar_datos()
+        return {"ok": True, "accion": accion, "resumen": f"Borré la publicación ({tipo})."}
+    elif accion == "estado":
+        return {"ok": True, "accion": accion, "resumen": "Hogger en línea",
+                "canales": [c.name for c in guild.text_channels],
+                "roles": [r.name for r in guild.roles if r.mentionable],
+                "raids": [{"id": k, "nombre": r["nombre"], "inicio": r["inicio"]} for k, r in datos["raids"].items()
+                          if r["inicio"] > time.time() - 3600]}
+    else:
+        raise OrdenInvalida(f"No conozco la acción '{accion}'.")
+    return {"ok": True, "accion": accion, "resumen": resumen, "id": str(msg.id), "canal": str(msg.channel.id),
+            "link": msg.jump_url}
+
+
+@bot.listen("on_message")
+async def buzon_cerebro(message: discord.Message):
+    if bot.user is None or message.author.id != bot.user.id or message.guild is None:
+        return
+    if getattr(message.channel, "name", None) != config.CANAL_CEREBRO or not message.content.startswith(MARCA_ORDEN):
+        return
+    try:
+        res = await ejecutar_orden(message.guild, _json_de(message.content))
+    except OrdenInvalida as e:
+        res = {"ok": False, "error": str(e)}
+    except json.JSONDecodeError:
+        res = {"ok": False, "error": "La orden no es un JSON válido."}
+    except discord.HTTPException as e:
+        res = {"ok": False, "error": f"Discord no me dejó: {e.text or e}"}
+    except Exception as e:  # que un error raro no tumbe al bot
+        print("Error en el buzón:", repr(e))
+        res = {"ok": False, "error": f"Error inesperado: {e!r}"}
+    linea = ("✅ " + res["resumen"]) if res["ok"] else ("❌ " + res["error"])
+    await message.reply(f"{linea}\n```json\n{json.dumps(res, ensure_ascii=False)}\n```", mention_author=False,
+                        allowed_mentions=discord.AllowedMentions.none())
+
+
+async def asegurar_canal_cerebro():
+    """Crea el canal privado del buzón si no existe (necesita el permiso Gestionar canales)."""
+    if not GUILD_ID.isdigit():
+        return
+    g = bot.get_guild(int(GUILD_ID))
+    if g is None or discord.utils.get(g.text_channels, name=config.CANAL_CEREBRO):
+        return
+    permisos = {
+        g.default_role: discord.PermissionOverwrite(view_channel=False),
+        g.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True,
+                                          embed_links=True, attach_files=True),
+    }
+    try:
+        await g.create_text_channel(config.CANAL_CEREBRO, overwrites=permisos,
+                                    topic="Buzón privado de El Cerebro. Hogger lee las órdenes de acá. No escribir.")
+        print(f"🧠 Creé el canal privado #{config.CANAL_CEREBRO} para El Cerebro.")
+    except discord.Forbidden:
+        print(f"⚠️ No pude crear #{config.CANAL_CEREBRO}: creálo a mano (privado) y dale acceso al rol de Hogger.")
 
 
 def pedir_ajustes():
