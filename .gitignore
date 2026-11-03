@@ -1,0 +1,9 @@
+# Secretos y estado: nunca al repositorio
+bot/.env
+bot/.env.txt
+bot/env.txt
+bot/datos.json
+bot/datos.json.tmp
+bot/.venv/
+__pycache__/
+*.pyc

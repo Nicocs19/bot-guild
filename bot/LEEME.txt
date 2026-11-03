@@ -1,0 +1,113 @@
+=====================================================
+  HOGGER, el bot propio de The H's (100% gratis)
+=====================================================
+
+Qué hace:
+  - Organiza TODOS los roles del server: orden, colores y crea los que faltan (/organizar-roles)
+  - Panel de roles con botones y menús: combate, CLASE (te pinta el nombre con el color
+    de tu clase), qué te gusta jugar, profesiones y avisos
+  - Bienvenida automática a cada nuevo con su avatar
+  - Anuncios lindos con el estilo dorado de la guild
+  - Bandas y eventos: la gente se anota como Tanque / Healer / DPS, con cupos y suplentes
+  - Sorteos con botón "Participar" y ganador elegido solo
+
+Corre en tu PC. Mientras la ventana de Hogger esté abierta, el bot está en línea.
+Consume casi nada (menos que una pestaña de Chrome).
+
+
+-----------------------------------------------------
+PASO 1: Crear el bot en Discord (5 minutos)
+-----------------------------------------------------
+1. Entrá a https://discord.com/developers/applications
+2. Botón "New Application", ponele de nombre: Hogger. Aceptá.
+3. En "General Information" podés subirle el logo de The H's como foto.
+4. Menú de la izquierda, "Bot":
+     - Activá "SERVER MEMBERS INTENT" (abajo, en Privileged Gateway Intents) y guardá.
+     - Tocá "Reset Token" y copiá el token. Es la CONTRASEÑA del bot:
+       no se la pases a nadie (ni a mí). Si se filtra, tocá Reset Token de nuevo.
+5. Menú de la izquierda, "OAuth2" → "URL Generator":
+     - En SCOPES tildá: bot  y  applications.commands
+     - En BOT PERMISSIONS tildá: Manage Roles, View Channels, Send Messages,
+       Embed Links, Read Message History, Mention Everyone
+     - Copiá el link de abajo, abrilo en el navegador y agregá el bot a tu servidor.
+
+-----------------------------------------------------
+PASO 2: Sacar el ID de tu servidor
+-----------------------------------------------------
+1. En Discord: Ajustes de usuario → Avanzado → activá "Modo desarrollador".
+2. Clic derecho sobre el ícono de tu servidor → "Copiar ID del servidor".
+
+-----------------------------------------------------
+PASO 3: Instalar en tu PC
+-----------------------------------------------------
+1. Instalá Python desde https://www.python.org/downloads/
+   MUY IMPORTANTE: en la primera pantalla tildá "Add python.exe to PATH".
+2. Poné esta carpeta (bot) donde quieras, por ejemplo en Documentos.
+3. Doble clic en  instalar.bat  y esperá.
+4. Doble clic en  iniciar.bat. La primera vez la ventana negra te pide:
+     TOKEN: pegalo (clic derecho o Ctrl+V) y Enter
+     ID DEL SERVER: pegalo y Enter (o Enter vacío si no lo tenés)
+5. Cuando diga "Hogger está en línea", listo.
+
+-----------------------------------------------------
+PASO 4: Un detalle en Discord (importante)
+-----------------------------------------------------
+Ajustes del servidor → Roles → arrastrá el rol del bot nuevo ARRIBA DE TODO
+(por encima de GM). Si no, no puede ordenar ni dar roles.
+
+Después, en #elige-tus-roles:
+  1. /organizar-roles  → renombra Tank→Tanque, pve→PvE, pvp→PvP (la gente los conserva),
+                         crea clases, profesiones y avisos, y ordena todo con colores.
+  2. Borrá el panel viejo de MEE6.
+  3. /panel-roles      → publica el panel nuevo.
+  4. /bienvenida canal:#bienvenidas
+
+-----------------------------------------------------
+PASO 5: Usarlo (escribí / en cualquier canal)
+-----------------------------------------------------
+  /organizar-roles → ordena roles, colores, crea los que falten (se puede repetir)
+  /panel-roles   → publicá el panel en tu canal de roles
+  /bienvenida    → elegí el canal donde saluda a los nuevos
+  /anuncio       → se abre una ventanita para escribir el anuncio
+  /banda         → nombre, cuándo, cupos de tanque/healer/dps
+  /sorteo        → premio, cuántos minutos dura, cuántos ganadores
+  /ayuda         → la lista de comandos
+  Para cerrar una banda: clic derecho al mensaje → Apps → Cerrar banda
+
+Los comandos solo los ven quienes tienen permiso de "Gestionar servidor" (oficiales).
+Los botones los puede usar todo el mundo.
+
+-----------------------------------------------------
+Cambiar textos, emojis o roles
+-----------------------------------------------------
+Abrí  config.py  con el Bloc de notas, cambiá lo que quieras entre comillas,
+guardá, cerrá la ventana de Hogger y abrí iniciar.bat de nuevo.
+Si cambiás los roles, volvé a usar /panel-roles y borrá el panel viejo.
+
+-----------------------------------------------------
+Que arranque solo al prender la PC (opcional)
+-----------------------------------------------------
+1. Clic derecho en iniciar.bat → "Crear acceso directo".
+2. Apretá Windows + R, escribí  shell:startup  y Enter.
+3. Mové el acceso directo a esa carpeta.
+
+-----------------------------------------------------
+Sacar MEE6 (cuando el bot nuevo ya funcione)
+-----------------------------------------------------
+1. Si pagás MEE6 Premium (el bot personalizado "Hogger el H" es de pago),
+   cancelá la suscripción en https://mee6.xyz → tu cuenta → Suscripciones.
+2. En Discord: Ajustes del servidor → Integraciones → MEE6 → Expulsar.
+   Hacé lo mismo con "Hogger el H" (el de MEE6).
+3. Los roles "MEE6" y "Hogger el H" se borran solos al expulsarlos.
+Mientras conviven, al bot nuevo ponele "Hogger" a secas para no confundirte.
+Los mensajes "¡Saluda!" de #general NO son de MEE6, son de Discord:
+se apagan en Ajustes del servidor → Interacción → Mensajes del sistema.
+
+-----------------------------------------------------
+Que Claude haga cosas en tu Discord desde el chat
+-----------------------------------------------------
+control.py deja que Claude, desde tu PC, publique anuncios, cree, edite o borre
+roles, sin ver nunca tu token. Necesita tu PC prendida y la app de Claude abierta.
+
+Los datos (bandas, sorteos, canales elegidos) se guardan en datos.json.
+No lo borres.
